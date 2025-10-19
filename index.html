@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Cek Pengetahuan Excel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .glowing-text {
+            animation: glowing 2s infinite;
+        }
+        @keyframes glowing {
+            0% { text-shadow: 0 0 5px #10B981, 0 0 10px #10B981, 0 0 15px #10B981; }
+            50% { text-shadow: 0 0 10px #10B981, 0 0 20px #10B981, 0 0 30px #10B981; }
+            100% { text-shadow: 0 0 5px #10B981, 0 0 10px #10B981, 0 0 15px #10B981; }
+        }
+        .letter-display {
+            min-width: 1ch; 
+        }
+        /* Style untuk modal agar muncul di atas */
+        #dictionaryModal {
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-lg mx-auto bg-white p-8 rounded-2xl shadow-2xl text-center space-y-6 border-4 border-emerald-500">
+        <!-- Header -->
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">Game Pengetahuan Excel</h1>
+            <p class="text-gray-500 mt-2">Uji wawasan Excel-mu dari huruf yang muncul!</p>
+        </div>
+
+        <!-- Display Huruf -->
+        <div class="bg-gray-100 rounded-xl p-10 flex items-center justify-center h-48">
+            <span id="letterDisplay" class="text-9xl font-black text-emerald-600 letter-display">?</span>
+        </div>
+
+        <!-- Tombol Kontrol -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button id="startButton" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-300">
+                Mulai Acak
+            </button>
+            <button id="stopButton" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-red-300" disabled>
+                Berhenti
+            </button>
+        </div>
+
+        <!-- Input Jawaban & Tombol Kamus -->
+        <div id="answerInputSection" class="hidden space-y-4 pt-4">
+            <p class="font-semibold text-lg">Apa istilah Excel yang berawalan huruf <span id="chosenLetter" class="font-bold text-emerald-600"></span>?</p>
+            <div class="flex gap-2">
+                <input type="text" id="answerInput" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-400 focus:border-transparent" placeholder="Ketik jawabanmu di sini...">
+                <button id="checkButton" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-5 rounded-lg transition duration-300">Cek</button>
+            </div>
+            <button id="dictionaryButton" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg transition duration-300">
+                Buka Kamus Jawaban
+            </button>
+        </div>
+
+        <!-- Hasil Pengecekan -->
+        <div id="checkResultSection" class="p-4 rounded-lg text-left hidden min-h-[100px]">
+            <!-- Hasil akan ditampilkan di sini -->
+        </div>
+
+        <!-- Footer -->
+        <footer class="pt-4 border-t border-gray-200">
+            <p class="text-sm text-gray-400">JAGO EXCEL </p>
+        </footer>
+    </div>
+
+    <!-- Modal Kamus -->
+    <div id="dictionaryModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h2 class="text-xl font-bold text-gray-800">Kamus untuk Huruf <span id="dictionaryLetter" class="text-emerald-600"></span></h2>
+                <button id="closeModalButton" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
+            </div>
+            <div class="p-6 overflow-y-auto">
+                <ul id="dictionaryList" class="list-disc list-inside space-y-2 text-left text-gray-700">
+                    <!-- List jawaban akan ditampilkan di sini -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // Elemen Utama
+        const letterDisplay = document.getElementById('letterDisplay');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        
+        // Elemen Jawaban
+        const answerInputSection = document.getElementById('answerInputSection');
+        const chosenLetter = document.getElementById('chosenLetter');
+        const answerInput = document.getElementById('answerInput');
+        const checkButton = document.getElementById('checkButton');
+        const checkResultSection = document.getElementById('checkResultSection');
+
+        // Elemen Kamus (Modal)
+        const dictionaryButton = document.getElementById('dictionaryButton');
+        const dictionaryModal = document.getElementById('dictionaryModal');
+        const dictionaryLetter = document.getElementById('dictionaryLetter');
+        const dictionaryList = document.getElementById('dictionaryList');
+        const closeModalButton = document.getElementById('closeModalButton');
+
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        let intervalId = null;
+        let isSpinning = false;
+        let currentLetter = '';
+        
+        // Database istilah Excel Edisi Final (lebih lengkap)
+        const excelTerms = {
+            'A': [
+                { term: 'ABSOLUTE REFERENCE', category: 'Konsep', description: 'Referensi sel yang tidak berubah saat disalin, ditandai dengan simbol dolar ($), contoh: $A$1.' },
+                { term: 'ADDRESS', category: 'Fungsi', description: 'Membuat alamat sel dalam bentuk teks berdasarkan nomor baris dan kolom.' },
+                { term: 'ALIGNMENT', category: 'Format', description: 'Mengatur perataan teks atau konten di dalam sel (kiri, kanan, tengah).' },
+                { term: 'AND', category: 'Fungsi Logika', description: 'Menghasilkan TRUE jika semua argumen yang diberikan bernilai TRUE.' },
+                { term: 'ARRAY', category: 'Konsep', description: 'Sekumpulan data atau nilai yang digunakan dalam satu formula (Array Formula).' },
+                { term: 'AUTOFILTER', category: 'Fitur', description: 'Nama lain untuk fitur Filter data.' },
+                { term: 'AUTOSUM', category: 'Fitur', description: 'Menjumlahkan angka secara otomatis di sel yang berdekatan.' },
+                { term: 'AVERAGE', category: 'Fungsi', description: 'Menghitung nilai rata-rata dari sekumpulan angka.' },
+                { term: 'AVERAGEIF', category: 'Fungsi', description: 'Menghitung rata-rata sel yang memenuhi kriteria tertentu.' },
+                { term: 'AVERAGEIFS', category: 'Fungsi', description: 'Menghitung rata-rata sel yang memenuhi beberapa kriteria.' },
+            ],
+            'B': [
+                { term: 'BOLD', category: 'Format', description: 'Membuat teks menjadi tebal.' },
+                { term: 'BORDER', category: 'Format', description: 'Memberikan garis tepi pada sel atau range.' },
+            ],
+            'C': [
+                { term: 'CELL', category: 'Bagian', description: 'Kotak pertemuan antara baris (row) dan kolom (column).' },
+                { term: 'CHART', category: 'Fitur', description: 'Representasi grafis dari data untuk mempermudah analisis.' },
+                { term: 'COLUMN', category: 'Bagian', description: 'Deretan sel vertikal yang ditandai dengan huruf (A, B, C, ...).' },
+                { term: 'CONCAT', category: 'Fungsi Teks', description: 'Fungsi modern untuk menggabungkan beberapa teks menjadi satu.' },
+                { term: 'CONCATENATE', category: 'Fungsi Teks', description: 'Fungsi lama untuk menggabungkan beberapa teks menjadi satu.' },
+                { term: 'CONDITIONAL FORMATTING', category: 'Fitur', description: 'Memberikan format khusus pada sel berdasarkan aturan atau kondisi tertentu.' },
+                { term: 'COPY', category: 'Aksi', description: 'Menyalin data dari satu lokasi ke lokasi lain.' },
+                { term: 'COUNT', category: 'Fungsi', description: 'Menghitung jumlah sel yang berisi angka.' },
+                { term: 'COUNTA', category: 'Fungsi', description: 'Menghitung jumlah sel yang tidak kosong.' },
+                { term: 'COUNTBLANK', category: 'Fungsi', description: 'Menghitung jumlah sel yang kosong.' },
+                { term: 'COUNTIF', category: 'Fungsi', description: 'Menghitung jumlah sel yang memenuhi satu kriteria.' },
+                { term: 'COUNTIFS', category: 'Fungsi', description: 'Menghitung jumlah sel yang memenuhi beberapa kriteria.' },
+                { term: 'CUT', category: 'Aksi', description: 'Memindahkan data dari satu lokasi ke lokasi lain.' },
+            ],
+            'D': [
+                { term: 'DATE', category: 'Fungsi', description: 'Membuat tanggal yang valid dari input tahun, bulan, dan hari.' },
+                { term: 'DATA VALIDATION', category: 'Fitur', description: 'Membatasi jenis data atau nilai yang bisa dimasukkan ke dalam sel.' },
+                { term: 'DATEDIF', category: 'Fungsi', description: 'Menghitung selisih antara dua tanggal dalam tahun, bulan, atau hari.' },
+                { term: 'DAVERAGE', category: 'Fungsi Database', description: 'Menghitung rata-rata entri dalam database yang memenuhi kriteria.' },
+                { term: 'DAY', category: 'Fungsi', description: 'Mengambil nilai hari (1-31) dari sebuah tanggal.' },
+                { term: 'DCOUNT', category: 'Fungsi Database', description: 'Menghitung sel dalam database yang berisi angka dan memenuhi kriteria.' },
+                { term: 'DELETE', category: 'Aksi', description: 'Menghapus sel, baris, kolom, atau isinya.' },
+                { term: 'DROP-DOWN LIST', category: 'Fitur', description: 'Membuat daftar pilihan yang bisa dipilih dalam sebuah sel.' },
+                { term: 'DSUM', category: 'Fungsi Database', description: 'Menjumlahkan angka dalam kolom database yang memenuhi kriteria.' },
+            ],
+            'E': [
+                { term: 'EDATE', category: 'Fungsi', description: 'Menghasilkan tanggal sekian bulan sebelum atau sesudah tanggal tertentu.' },
+                { term: 'EOMONTH', category: 'Fungsi', description: 'Menghasilkan tanggal akhir bulan, sekian bulan sebelum atau sesudah tanggal tertentu.' },
+                { term: 'ERFC', category: 'Fungsi Engineering', description: 'Mengembalikan fungsi galat komplementer.' },
+                { term: 'EVEN', category: 'Fungsi Matematika', description: 'Membulatkan angka ke atas ke bilangan genap terdekat.' },
+                { term: 'EXACT', category: 'Fungsi Teks', description: 'Memeriksa apakah dua string teks identik (case-sensitive).' },
+            ],
+            'F': [
+                { term: 'FILL', category: 'Format', description: 'Memberi warna latar belakang pada sel.' },
+                { term: 'FILTER', category: 'Fitur', description: 'Menyaring dan menampilkan data yang sesuai dengan kriteria tertentu.' },
+                { term: 'FILTER', category: 'Fungsi (Dynamic Array)', description: 'Fungsi modern untuk menyaring data berdasarkan kriteria (membutuhkan Excel 365/2021).' },
+                { term: 'FIND', category: 'Fungsi', description: 'Mencari posisi sebuah teks di dalam teks lain (case-sensitive).' },
+                { term: 'FIND & REPLACE', category: 'Fitur', description: 'Mencari teks dan menggantinya dengan teks lain.' },
+                { term: 'FONT', category: 'Format', description: 'Mengubah jenis, ukuran, dan warna huruf.' },
+                { term: 'FORMULA BAR', category: 'Bagian', description: 'Area di atas lembar kerja untuk melihat atau mengedit isi sel aktif.' },
+                { term: 'FREEZE PANES', category: 'Fitur', description: 'Membekukan baris atau kolom agar tetap terlihat saat menggulir (scroll).' },
+            ],
+            'G': [
+                { term: 'GOAL SEEK', category: 'Fitur', description: 'Mencari nilai input yang dibutuhkan untuk mencapai hasil yang diinginkan.' },
+            ],
+            'H': [
+                { term: 'HLOOKUP', category: 'Fungsi', description: 'Mencari data secara horizontal (berdasarkan baris) di sebuah tabel.' },
+                { term: 'HYPERLINK', category: 'Fitur', description: 'Tautan yang bisa diklik untuk membuka file lain atau halaman web.' },
+            ],
+            'I': [
+                { term: 'IF', category: 'Fungsi Logika', description: 'Melakukan pengecekan kondisi, memberikan satu hasil jika BENAR dan hasil lain jika SALAH.' },
+                { term: 'IFERROR', category: 'Fungsi Logika', description: 'Menampilkan nilai tertentu jika sebuah rumus menghasilkan error.' },
+                { term: 'IFS', category: 'Fungsi Logika', description: 'Fungsi modern untuk melakukan beberapa pengecekan kondisi sekaligus.' },
+                { term: 'INDEX', category: 'Fungsi', description: 'Mengambil nilai dari sebuah tabel atau range berdasarkan nomor baris dan kolom.' },
+                { term: 'INSERT', category: 'Menu', description: 'Tab pada Ribbon untuk menyisipkan objek seperti tabel, gambar, dan chart.' },
+                { term: 'ISBLANK', category: 'Fungsi Informasi', description: 'Memeriksa apakah sebuah sel kosong dan mengembalikan TRUE atau FALSE.' },
+                { term: 'ISNUMBER', category: 'Fungsi Informasi', description: 'Memeriksa apakah sebuah nilai adalah angka dan mengembalikan TRUE atau FALSE.' },
+                { term: 'ISTEXT', category: 'Fungsi Informasi', description: 'Memeriksa apakah sebuah nilai adalah teks dan mengembalikan TRUE atau FALSE.' },
+                { term: 'ITALIC', category: 'Format', description: 'Membuat teks menjadi miring.' },
+            ],
+            'L': [
+                { term: 'LEFT', category: 'Fungsi Teks', description: 'Mengambil sejumlah karakter dari sisi kiri sebuah teks.' },
+                { term: 'LEN', category: 'Fungsi Teks', description: 'Menghitung jumlah karakter dalam sebuah teks.' },
+                { term: 'LOWER', category: 'Fungsi Teks', description: 'Mengubah semua teks menjadi huruf kecil.' },
+            ],
+            'M': [
+                { term: 'MATCH', category: 'Fungsi', description: 'Mencari posisi relatif sebuah item di dalam range.' },
+                { term: 'MAX', category: 'Fungsi', description: 'Menemukan nilai terbesar dari sekumpulan angka.' },
+                { term: 'MERGE & CENTER', category: 'Fitur', description: 'Menggabungkan beberapa sel menjadi satu dan menengahkan isinya.' },
+                { term: 'MID', category: 'Fungsi Teks', description: 'Mengambil sejumlah karakter dari tengah sebuah teks.' },
+                { term: 'MIN', category: 'Fungsi', description: 'Menemukan nilai terkecil dari sekumpulan angka.' },
+                { term: 'MODE', category: 'Fungsi Statistik', description: 'Mengembalikan nilai yang paling sering muncul dalam kumpulan data.' },
+                { term: 'MONTH', category: 'Fungsi', description: 'Mengambil nilai bulan (1-12) dari sebuah tanggal.' },
+            ],
+            'N': [
+                { term: 'NAME BOX', category: 'Bagian', description: 'Kotak di sebelah kiri Formula Bar yang menampilkan alamat sel aktif atau nama range.' },
+                { term: 'NAMED RANGE', category: 'Fitur', description: 'Memberi nama pada sebuah sel atau range untuk mempermudah penggunaan dalam rumus.' },
+                { term: 'NOW', category: 'Fungsi', description: 'Menampilkan tanggal dan waktu saat ini.' },
+            ],
+            'O': [
+                { term: 'ODD', category: 'Fungsi Matematika', description: 'Membulatkan angka ke atas ke bilangan ganjil terdekat.' },
+                { term: 'OFFSET', category: 'Fungsi', description: 'Membuat referensi ke sebuah range yang berjarak dari sel atau range lain.' },
+                { term: 'OR', category: 'Fungsi Logika', description: 'Menghasilkan TRUE jika salah satu argumen yang diberikan bernilai TRUE.' },
+            ],
+            'P': [
+                { term: 'PAGE LAYOUT', category: 'Menu', description: 'Tab pada Ribbon untuk mengatur tampilan halaman, margin, dan orientasi cetak.' },
+                { term: 'PASTE', category: 'Aksi', description: 'Menempelkan data yang telah disalin (copy) atau dipotong (cut).' },
+                { term: 'PASTE SPECIAL', category: 'Fitur', description: 'Menempelkan aspek tertentu dari data yang disalin (misal: hanya nilai, hanya format).' },
+                { term: 'PIVOT TABLE', category: 'Fitur', description: 'Alat analisis canggih untuk merangkum dan menganalisis data dalam jumlah besar.' },
+                { term: 'POWER QUERY', category: 'Fitur', description: 'Alat untuk mengimpor, membersihkan, dan mengubah data dari berbagai sumber.' },
+                { term: 'PRINT', category: 'Aksi', description: 'Mencetak lembar kerja ke printer atau file PDF.' },
+                { term: 'PROPER', category: 'Fungsi Teks', description: 'Mengubah huruf pertama setiap kata menjadi kapital.' },
+                { term: 'PROTECT SHEET', category: 'Fitur', description: 'Melindungi lembar kerja agar tidak bisa diubah tanpa password.' },
+            ],
+            'Q': [
+                { term: 'QUICK ACCESS TOOLBAR', category: 'Bagian', description: 'Toolbar kecil di bagian atas jendela untuk akses cepat ke perintah favorit.' },
+            ],
+            'R': [
+                { term: 'RAND', category: 'Fungsi', description: 'Menghasilkan angka acak antara 0 dan 1.' },
+                { term: 'RANDBETWEEN', category: 'Fungsi', description: 'Menghasilkan angka acak di antara dua angka yang ditentukan.' },
+                { term: 'REDO', category: 'Aksi', description: 'Mengulangi aksi terakhir yang dibatalkan (misalnya dengan Undo).' },
+                { term: 'RELATIVE REFERENCE', category: 'Konsep', description: 'Referensi sel yang berubah secara otomatis saat disalin, contoh: A1.' },
+                { term: 'REPLACE', category: 'Fungsi Teks', description: 'Mengganti sebagian teks dengan teks lain.' },
+                { term: 'RIBBON', category: 'Bagian', description: 'Panel di bagian atas jendela Excel yang berisi semua perintah dan fitur.' },
+                { term: 'RIGHT', category: 'Fungsi Teks', description: 'Mengambil sejumlah karakter dari sisi kanan sebuah teks.' },
+                { term: 'ROUND', category: 'Fungsi', description: 'Membulatkan angka ke jumlah digit yang ditentukan.' },
+                { term: 'ROW', category: 'Bagian', description: 'Deretan sel horizontal yang ditandai dengan angka (1, 2, 3, ...).' },
+            ],
+            'S': [
+                { term: 'SAVE', category: 'Aksi', description: 'Menyimpan perubahan yang dibuat pada workbook.' },
+                { term: 'SEARCH', category: 'Fungsi Teks', description: 'Mencari posisi sebuah teks di dalam teks lain (tidak case-sensitive).' },
+                { term: 'SEQUENCE', category: 'Fungsi (Dynamic Array)', description: 'Fungsi modern untuk membuat daftar angka berurutan (membutuhkan Excel 365/2021).' },
+                { term: 'SHEET', category: 'Bagian', description: 'Sebuah lembar kerja di dalam file Excel (Workbook).' },
+                { term: 'SLICER', category: 'Fitur', description: 'Tombol interaktif untuk memfilter data di Pivot Table atau Tabel.' },
+                { term: 'SORT', category: 'Fitur', description: 'Mengurutkan data berdasarkan kriteria (misal: A-Z atau terkecil ke terbesar).' },
+                { term: 'SPARKLINE', category: 'Fitur', description: 'Grafik mini di dalam satu sel untuk memvisualisasikan tren data.' },
+                { term: 'STATUS BAR', category: 'Bagian', description: 'Baris di bagian bawah jendela Excel yang menampilkan informasi ringkas seperti Sum dan Average.' },
+                { term: 'SUBSTITUTE', category: 'Fungsi Teks', description: 'Mengganti teks tertentu dalam sebuah string teks.' },
+                { term: 'SUM', category: 'Fungsi', description: 'Menjumlahkan semua angka dalam sebuah range sel.' },
+                { term: 'SUMIF', category: 'Fungsi', description: 'Menjumlahkan angka dalam sebuah range yang memenuhi kriteria tertentu.' },
+                { term: 'SUMIFS', category: 'Fungsi', description: 'Menjumlahkan angka dalam sebuah range yang memenuhi beberapa kriteria.' },
+                { term: 'SUMPRODUCT', category: 'Fungsi', description: 'Mengalikan komponen yang sesuai dalam array dan mengembalikan jumlah dari hasil perkalian tersebut.' },
+            ],
+            'T': [
+                { term: 'T', category: 'Fungsi Teks', description: 'Memeriksa apakah suatu nilai adalah teks dan mengembalikan teks tersebut jika benar, atau teks kosong jika salah.' },
+                { term: 'T.DIST', category: 'Fungsi Statistik', description: 'Mengembalikan Distribusi-t Student.' },
+                { term: 'T.INV', category: 'Fungsi Statistik', description: 'Mengembalikan invers dari Distribusi-t Student.' },
+                { term: 'T.TEST', category: 'Fungsi Statistik', description: 'Mengembalikan probabilitas yang terkait dengan Uji-t Student.' },
+                { term: 'TABLE', category: 'Fitur', description: 'Mengubah range data menjadi tabel terstruktur dengan fitur sortir dan filter bawaan.' },
+                { term: 'TEXT', category: 'Fungsi', description: 'Mengubah nilai menjadi teks dengan format angka tertentu.' },
+                { term: 'TEXTJOIN', category: 'Fungsi Teks', description: 'Fungsi modern untuk menggabungkan teks dengan pemisah (delimiter).' },
+                { term: 'TODAY', category: 'Fungsi', description: 'Menampilkan tanggal hari ini.' },
+                { term: 'TRANSPOSE', category: 'Fungsi', description: 'Mengubah orientasi data dari baris menjadi kolom, atau sebaliknya.' },
+                { term: 'TRIM', category: 'Fungsi Teks', description: 'Menghapus spasi berlebih dari sebuah teks.' },
+            ],
+            'U': [
+                 { term: 'UNDERLINE', category: 'Format', description: 'Memberi garis bawah pada teks.' },
+                 { term: 'UNDO', category: 'Aksi', description: 'Membatalkan aksi atau perintah terakhir yang dilakukan.' },
+                 { term: 'UNIQUE', category: 'Fungsi (Dynamic Array)', description: 'Fungsi modern untuk menampilkan daftar nilai unik dari sebuah range (membutuhkan Excel 365/2021).' },
+                 { term: 'UPPER', category: 'Fungsi Teks', description: 'Mengubah semua teks menjadi huruf kapital.' },
+            ],
+            'V': [
+                { term: 'VALUE', category: 'Fungsi', description: 'Mengubah teks yang terlihat seperti angka menjadi format angka sebenarnya.' },
+                { term: 'VLOOKUP', category: 'Fungsi', description: 'Mencari data secara vertikal (berdasarkan kolom) di sebuah tabel.' },
+            ],
+            'W': [
+                { term: 'WORKBOOK', category: 'Bagian', description: 'File Excel itu sendiri, yang bisa berisi satu atau lebih worksheet.' },
+                { term: 'WORKSHEET', category: 'Bagian', description: 'Nama lain untuk Sheet atau lembar kerja.' },
+                { term: 'WRAP TEXT', category: 'Fitur', description: 'Membuat teks yang panjang ditampilkan dalam beberapa baris di dalam satu sel.' },
+            ],
+            'X': [
+                { term: 'XLOOKUP', category: 'Fungsi', description: 'Fungsi pencarian modern dan fleksibel, penerus VLOOKUP dan HLOOKUP.' },
+            ],
+            'Y': [
+                { term: 'YEAR', category: 'Fungsi', description: 'Mengambil nilai tahun dari sebuah tanggal.' },
+            ],
+        };
+
+        // --- FUNGSI UTAMA ---
+
+        function startSpin() {
+            if (isSpinning) return;
+            isSpinning = true;
+            
+            checkResultSection.classList.add('hidden');
+            answerInputSection.classList.add('hidden');
+            answerInput.value = '';
+            letterDisplay.classList.add('glowing-text');
+
+            startButton.disabled = true;
+            startButton.classList.add('opacity-50', 'cursor-not-allowed');
+            stopButton.disabled = false;
+            stopButton.classList.remove('opacity-50', 'cursor-not-allowed');
+
+            intervalId = setInterval(() => {
+                const randomIndex = Math.floor(Math.random() * alphabet.length);
+                letterDisplay.textContent = alphabet[randomIndex];
+            }, 100);
+        }
+
+        function stopSpin() {
+            if (!isSpinning) return;
+            isSpinning = false;
+
+            clearInterval(intervalId);
+            letterDisplay.classList.remove('glowing-text');
+            currentLetter = letterDisplay.textContent;
+            
+            chosenLetter.textContent = currentLetter;
+            answerInputSection.classList.remove('hidden');
+
+            startButton.disabled = false;
+            startButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            stopButton.disabled = true;
+            stopButton.classList.add('opacity-50', 'cursor-not-allowed');
+            answerInput.focus();
+        }
+
+        function checkAnswer() {
+            const userAnswer = answerInput.value.trim().toUpperCase();
+
+            if (!userAnswer) {
+                showResult('error', 'Kolom jawaban tidak boleh kosong!');
+                return;
+            }
+
+            if (userAnswer[0] !== currentLetter) {
+                showResult('error', `Jawaban harus dimulai dengan huruf "${currentLetter}"!`);
+                return;
+            }
+
+            const termsForLetter = excelTerms[currentLetter] || [];
+            // Mencari jawaban yang cocok tanpa mempedulikan spasi, titik, atau tanda &
+            const normalizedUserAnswer = userAnswer.replace(/[\s&.]+/g, '');
+            const foundTerm = termsForLetter.find(item => item.term.replace(/[\s&.]+/g, '') === normalizedUserAnswer);
+
+            if (foundTerm) {
+                showResult('success', `
+                    <h3 class="font-bold text-lg text-green-800">BENAR! Jawaban ditemukan.</h3>
+                    <p><strong class="font-semibold text-gray-800">${foundTerm.term}</strong></p>
+                    <p><span class="bg-green-200 text-green-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded">${foundTerm.category}</span></p>
+                    <p class="mt-2 text-gray-700">${foundTerm.description}</p>
+                `);
+            } else {
+                showResult('error', `Jawaban "${userAnswer}" tidak ditemukan di kamus. Coba istilah lain!`);
+            }
+        }
+        
+        function showResult(type, message) {
+            checkResultSection.classList.remove('hidden', 'bg-green-100', 'bg-red-100');
+            if (type === 'success') {
+                checkResultSection.classList.add('bg-green-100');
+                checkResultSection.innerHTML = message;
+            } else {
+                checkResultSection.classList.add('bg-red-100');
+                checkResultSection.innerHTML = `<p class="font-bold text-red-800">${message}</p>`;
+            }
+        }
+
+        // --- FUNGSI KAMUS (MODAL) ---
+
+        function showDictionary() {
+            const terms = excelTerms[currentLetter] || [];
+            dictionaryList.innerHTML = ''; // Kosongkan daftar sebelumnya
+            dictionaryLetter.textContent = currentLetter;
+
+            if (terms.length > 0) {
+                terms.forEach(term => {
+                    const li = document.createElement('li');
+                    li.textContent = term.term;
+                    dictionaryList.appendChild(li);
+                });
+            } else {
+                const li = document.createElement('li');
+                li.textContent = 'Tidak ada istilah yang ditemukan untuk huruf ini.';
+                dictionaryList.appendChild(li);
+            }
+            dictionaryModal.classList.remove('hidden');
+        }
+
+        function hideDictionary() {
+            dictionaryModal.classList.add('hidden');
+        }
+
+        // --- EVENT LISTENERS ---
+        
+        startButton.addEventListener('click', startSpin);
+        stopButton.addEventListener('click', stopSpin);
+        checkButton.addEventListener('click', checkAnswer);
+        answerInput.addEventListener('keyup', function(event) {
+            if (event.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+
+        // Event listener untuk kamus
+        dictionaryButton.addEventListener('click', showDictionary);
+        closeModalButton.addEventListener('click', hideDictionary);
+        dictionaryModal.addEventListener('click', (event) => {
+            // Tutup modal jika klik di area luar (overlay)
+            if (event.target === dictionaryModal) {
+                hideDictionary();
+            }
+        });
+        
+        // Inisialisasi Tombol Stop
+        stopButton.classList.add('opacity-50', 'cursor-not-allowed');
+    </script>
+</body>
+</html>
